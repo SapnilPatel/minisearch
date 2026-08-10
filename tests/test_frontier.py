@@ -29,6 +29,7 @@ def test_fifo_within_same_depth_and_host():
     f.add("http://a.com/1", depth=1)
     f.add("http://a.com/2", depth=1)
     assert f.pop_ready(0.0).url == "http://a.com/1"
+    f.host_done("a.com", 0.0)
     assert f.pop_ready(0.0).url == "http://a.com/2"
 
 
@@ -46,9 +47,34 @@ def test_same_host_respects_delay():
     f.add("http://a.com/1")
     f.add("http://a.com/2")
     assert f.pop_ready(now=0.0) is not None
+    f.host_done("a.com", now=0.0)                # fetch finished at t=0
     assert f.pop_ready(now=0.5) is None          # still inside the delay window
     assert f.time_until_ready(now=0.5) == 1.5
     assert f.pop_ready(now=2.0) is not None      # window elapsed
+
+
+def test_host_stays_locked_until_host_done():
+    # Per-host concurrency 1: even with the delay elapsed, the host's next URL
+    # is not released while a fetch is in flight — only host_done unlocks it.
+    f = make(delay=0.0)
+    f.add("http://a.com/1")
+    f.add("http://a.com/2")
+    assert f.pop_ready(now=0.0) is not None
+    assert f.pop_ready(now=99.0) is None         # in flight -> locked, despite delay=0
+    f.host_done("a.com", now=99.0)
+    assert f.pop_ready(now=99.0) is not None
+
+
+def test_delay_counts_from_completion_not_start():
+    # A slow response must push the next request out: delay is measured from
+    # host_done (fetch completion), not from pop (fetch start).
+    f = make(delay=1.0)
+    f.add("http://a.com/1")
+    f.add("http://a.com/2")
+    assert f.pop_ready(now=0.0) is not None
+    f.host_done("a.com", now=5.0)                # the fetch took 5s
+    assert f.pop_ready(now=5.5) is None          # 1s delay from t=5, not t=0
+    assert f.pop_ready(now=6.0) is not None
 
 
 def test_different_hosts_are_independent():
@@ -90,6 +116,7 @@ def test_interleaves_hosts_over_time():
             now += f.time_until_ready(now)
             continue
         order.append(item.host)
+        f.host_done(item.host, now)
     # Never two consecutive fetches of the same host without its delay: with two
     # hosts and equal work, the sequence strictly alternates.
     assert order[:2] in (["a.com", "b.com"], ["b.com", "a.com"])
@@ -121,6 +148,7 @@ def test_popped_urls_are_never_readded():
     f = make(delay=0.0)
     f.add("http://a.com/1")
     assert f.pop_ready(0.0) is not None
+    f.host_done("a.com", 0.0)
     assert f.add("http://a.com/1") is False      # seen forever, not just while queued
 
 
@@ -139,8 +167,9 @@ def test_drains_completely():
     for i in range(20):
         f.add(f"http://h{i % 4}.com/{i}")
     count = 0
-    while f.pop_ready(0.0) is not None:
+    while (item := f.pop_ready(0.0)) is not None:
         count += 1
+        f.host_done(item.host, 0.0)
     assert count == 20
     assert len(f) == 0
 
@@ -153,4 +182,5 @@ def test_more_hosts_than_back_queues():
     served = set()
     while (item := f.pop_ready(0.0)) is not None:
         served.add(item.host)
+        f.host_done(item.host, 0.0)
     assert len(served) == 6

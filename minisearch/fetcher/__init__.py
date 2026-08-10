@@ -5,9 +5,10 @@ giving natural backpressure: if the indexer falls behind, the channel fills and
 fetchers block instead of accumulating an unbounded backlog. Handles timeouts,
 retry with exponential backoff, robots.txt, max page size, and graceful shutdown.
 
-Milestone 1 ships the single-page fetch below; the pool is added in Milestone 3.
+Milestone 1 shipped the single-page fetch; Milestone 3 added the pool.
 """
 
+from minisearch.fetcher.pool import Crawler, CrawlStats
 from minisearch.fetcher.single import (
     DisallowedError,
     FetchError,
@@ -15,4 +16,11 @@ from minisearch.fetcher.single import (
     fetch_page,
 )
 
-__all__ = ["DisallowedError", "FetchError", "FetchResult", "fetch_page"]
+__all__ = [
+    "Crawler",
+    "CrawlStats",
+    "DisallowedError",
+    "FetchError",
+    "FetchResult",
+    "fetch_page",
+]

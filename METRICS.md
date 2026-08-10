@@ -14,14 +14,14 @@ they must be honest and reproducible.
 
 | Field | Value |
 |---|---|
-| Machine | (TBD — record CPU / RAM / OS on first benchmark) |
-| Python | 3.13 |
+| Machine | Apple M4, 16 GB RAM, macOS (Darwin 25.5) |
+| Python | 3.13.5 |
 
 ## Results
 
 | Metric | Milestone | Value | Notes |
 |---|---|---|---|
-| Pages crawled/sec | 3 | — | headline throughput |
+| Pages crawled/sec | 3 | **~7,400 pages/sec** (7375 / 7408 / 7419 over 3 runs; 1,000 pages, 8 workers, ~1 KB pages, localhost, politeness delay 0) | headline throughput. Localhost = upper bound on pool overhead; real crawls are network/politeness-bound. Peak RSS 40.4 MB. `scripts/bench_crawl.py` |
 | Documents indexed/sec | 6 | — | ingest performance |
 | Batch vs row-by-row insert speedup | 6 | — | DB optimization |
 | Query latency p50 / p99 | 7 | — | the SDE headline number |

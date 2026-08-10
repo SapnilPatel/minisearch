@@ -16,6 +16,15 @@ its back queue is rescheduled to ``now + delay``, so every other due host is
 served before it comes around again. That is the concrete answer to the classic
 "what if one host dominates the frontier?" question.
 
+**The pop/host_done protocol.** ``pop_ready`` marks the host *busy* and callers
+must call ``host_done(host, now)`` when the fetch finishes; only then is the host
+rescheduled at ``now + delay``. Rescheduling at pop time — the obvious design —
+only spaces request *starts*: a response slower than the delay would let a second
+request to the same host begin while the first is still in flight, silently
+violating per-host concurrency 1. Locking the host for the duration of its fetch
+is what actually enforces it. (Found while building the Milestone 3 pool; see
+BUGLOG.md.)
+
 **Determinism for testing.** ``pop_ready`` takes an explicit ``now`` (monotonic
 seconds) rather than reading the clock, so politeness is testable without
 sleeping. Production Mercator also *randomizes* front-queue selection to avoid
@@ -64,8 +73,12 @@ class Frontier:
         ]
         # Back queues: host -> its FIFO of URLs. At most _back_count hosts here.
         self._back: dict[str, deque[FrontierItem]] = {}
-        # Min-heap of (next_allowed_time, seq, host); one entry per active host.
+        # Min-heap of (next_allowed_time, seq, host). Invariant: exactly one
+        # entry per non-busy host in _back; busy hosts have no entry until
+        # host_done() reschedules them.
         self._ready: list[tuple[float, int, str]] = []
+        # Hosts with a fetch currently in flight (popped, not yet host_done).
+        self._busy: set[str] = set()
 
         # Dedup of every URL ever enqueued. NOTE: this grows unbounded — exactly
         # the memory problem the Milestone 4 bloom filter replaces it with.
@@ -98,9 +111,10 @@ class Frontier:
     def pop_ready(self, now: float) -> FrontierItem | None:
         """Return the next URL allowed by politeness at ``now``, or None.
 
-        None means either the frontier is empty or every host with queued work is
-        still inside its politeness delay — call ``time_until_ready`` to learn how
-        long until the next one frees up.
+        None means the frontier is empty, every queued host is inside its
+        politeness delay, or every queued host is busy. The caller MUST call
+        ``host_done(item.host, now)`` when the fetch completes — the host stays
+        locked (per-host concurrency 1) until then.
         """
         self._fill(now)
         while self._ready:
@@ -113,16 +127,33 @@ class Frontier:
                 continue  # defensive: skip a stale heap entry
             item = queue.popleft()
             self._size -= 1
-            if queue:
-                self._reschedule(host, now)  # host has more; wait out the delay
-            else:
-                del self._back[host]         # host drained; free the slot
-                self._fill(now)              # admit a new host in its place
+            # Lock the host for the duration of the fetch. Its (possibly empty)
+            # back queue keeps holding the slot so same-host URLs keep routing
+            # here; host_done() releases or frees it.
+            self._busy.add(host)
             return item
         return None
 
+    def host_done(self, host: str, now: float) -> None:
+        """Report that the fetch for ``host`` finished; reschedule it politely.
+
+        If the host has more queued URLs its next one becomes fetchable at
+        ``now + delay``; otherwise its back-queue slot is freed for a new host.
+        """
+        self._busy.discard(host)
+        queue = self._back.get(host)
+        if queue:
+            self._reschedule(host, now)
+        else:
+            self._back.pop(host, None)   # drained; free the slot
+            self._fill(now)              # admit a waiting host in its place
+
     def time_until_ready(self, now: float) -> float | None:
-        """Seconds until some host becomes fetchable, or None if the frontier is empty."""
+        """Seconds until some host becomes fetchable.
+
+        None means nothing is scheduled: the frontier is empty, or every queued
+        host is busy (in which case a ``host_done`` call will schedule one).
+        """
         self._fill(now)
         while self._ready:
             when, _seq, host = self._ready[0]

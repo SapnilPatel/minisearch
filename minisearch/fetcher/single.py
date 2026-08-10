@@ -84,7 +84,10 @@ async def fetch_page(
                     content_type=content_type,
                     body=body,
                 )
-        except aiohttp.ClientError as exc:
+        except (aiohttp.ClientError, TimeoutError) as exc:
+            # TimeoutError: aiohttp raises asyncio timeouts directly, not as a
+            # ClientError subclass — without this, a slow host would crash a
+            # worker instead of counting as a retryable fetch failure.
             raise FetchError(f"fetch failed for {current}: {exc}") from exc
 
     raise FetchError(f"too many redirects starting from {url}")

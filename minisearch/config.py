@@ -64,6 +64,8 @@ class Config:
     request_timeout_s: float = 10.0
     max_page_bytes: int = 5 * 1024 * 1024
     max_retries: int = 3
+    # Base for exponential backoff between retries (base * 2^attempt + jitter).
+    retry_base_delay_s: float = 0.5
 
     # --- Frontier (Milestone 2) ---------------------------------------------
     max_frontier_size: int = 100_000
@@ -102,6 +104,7 @@ class Config:
         _set("request_timeout_s", _env_float("REQUEST_TIMEOUT_S"))
         _set("max_page_bytes", _env_int("MAX_PAGE_BYTES"))
         _set("max_retries", _env_int("MAX_RETRIES"))
+        _set("retry_base_delay_s", _env_float("RETRY_BASE_DELAY_S"))
         _set("max_frontier_size", _env_int("MAX_FRONTIER_SIZE"))
         _set("per_host_delay_s", _env_float("PER_HOST_DELAY_S"))
         _set("database_url", _env_str("DATABASE_URL"))
