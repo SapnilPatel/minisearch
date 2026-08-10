@@ -10,6 +10,24 @@ lesson.
 
 ---
 
+## M7 — top-K heap evicted the wrong entry on score ties
+
+- **What broke:** with K=2 full of two score-1.0 entries, offering a third
+  score-1.0 item *displaced the oldest one* instead of being rejected.
+- **How it surfaced:** `test_topk_ties_keep_insertion_order` failed on the
+  first run — written precisely because tie behavior is where top-K
+  implementations quietly go wrong.
+- **Root cause:** heap entries were `(score, seq, item)` with ascending seq as
+  tiebreak. On a score tie, a *later* arrival has a larger seq, so
+  `entry > heap[0]` compared True and `heapreplace` evicted the root. The
+  tiebreak existed to keep `item` out of comparisons, but it accidentally
+  defined tie *policy* too.
+- **The fix:** store `-seq`, making later arrivals compare as worse: ties never
+  evict an admitted entry, and among admitted ties the newest is evicted first.
+- **Lesson:** every field in a heap key participates in ordering whether you
+  meant it to or not. A tiebreak added "just for comparability" is still
+  policy — choose its direction deliberately.
+
 ## M3 — delay-spacing is not per-host concurrency 1
 
 - **What broke:** nothing visibly — a silent design gap. The M2 frontier

@@ -80,6 +80,12 @@ class Config:
     # --- Store / Postgres (Milestone 6) -------------------------------------
     database_url: str = "postgresql://localhost:5432/minisearch"
 
+    # --- Ranking (Milestone 7) ----------------------------------------------
+    # BM25 tunables: k1 controls term-frequency saturation, b controls
+    # document-length normalization. Literature defaults.
+    bm25_k1: float = 1.5
+    bm25_b: float = 0.75
+
     # --- API (Milestone 8) --------------------------------------------------
     api_host: str = "127.0.0.1"
     api_port: int = 8080
@@ -116,6 +122,8 @@ class Config:
         _set("bloom_expected_urls", _env_int("BLOOM_EXPECTED_URLS"))
         _set("bloom_target_fpr", _env_float("BLOOM_TARGET_FPR"))
         _set("database_url", _env_str("DATABASE_URL"))
+        _set("bm25_k1", _env_float("BM25_K1"))
+        _set("bm25_b", _env_float("BM25_B"))
         _set("api_host", _env_str("API_HOST"))
         _set("api_port", _env_int("API_PORT"))
 
