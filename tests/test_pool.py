@@ -88,7 +88,7 @@ async def test_crawls_all_seeds(server):
     stats = await crawl
     assert stats.fetched == PAGES
     assert len(results) == PAGES
-    assert {r.status for r in results} == {200}
+    assert {r.fetch.status for r in results} == {200}
 
 
 async def test_per_host_delay_is_enforced_under_concurrency(server):
@@ -112,7 +112,7 @@ async def test_retry_recovers_from_transient_5xx(server):
     stats = await crawl
     assert stats.fetched == 1
     assert stats.retries == 2          # failed twice, then succeeded
-    assert results[0].body == "recovered"
+    assert results[0].fetch.body == "recovered"
 
 
 async def test_retry_gives_up_after_max_retries(server):
@@ -189,3 +189,76 @@ async def test_graceful_shutdown_mid_crawl(server):
 
     assert 3 <= stats.fetched < 50
     assert stats.fetched == len(results)                  # nothing lost or dropped
+
+
+# -- link following (the crawl loop, Milestone 5) -----------------------------
+
+
+@pytest.fixture
+async def linked_site():
+    """A small site: / links to /a and /b; /a links to /deep; /deep links to /a
+    (a cycle) and back to / (already seen)."""
+
+    def html(body: str) -> web.Response:
+        return web.Response(text=f"<html><body>{body}</body></html>",
+                            content_type="text/html")
+
+    async def root(_r):
+        return html('root <a href="/a">a</a> <a href="/b">b</a>')
+
+    async def a(_r):
+        return html('page a <a href="/deep">deep</a>')
+
+    async def b(_r):
+        return html("page b, no links")
+
+    async def deep(_r):
+        return html('deep <a href="/a">cycle</a> <a href="/">home</a>')
+
+    app = web.Application()
+    app.router.add_get("/", root)
+    app.router.add_get("/a", a)
+    app.router.add_get("/b", b)
+    app.router.add_get("/deep", deep)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    try:
+        yield f"http://127.0.0.1:{runner.addresses[0][1]}"
+    finally:
+        await runner.cleanup()
+
+
+async def test_follows_links_to_max_depth(linked_site):
+    crawler = Crawler(_config(), max_depth=2)
+    crawl = asyncio.create_task(crawler.crawl([linked_site + "/"]))
+    results = await _drain(crawler)
+    stats = await crawl
+    paths = sorted(r.fetch.url.rsplit("/", 1)[1] or "/" for r in results)
+    # depth 0: /, depth 1: /a /b, depth 2: /deep. The /deep->/a cycle and the
+    # link back to / are absorbed by the bloom filter, not refetched.
+    assert stats.fetched == 4
+    assert paths == ["/", "a", "b", "deep"]
+    depths = {r.fetch.url.rsplit("/", 1)[1] or "/": r.depth for r in results}
+    assert depths["/"] == 0 and depths["a"] == 1 and depths["deep"] == 2
+
+
+async def test_max_depth_zero_fetches_seeds_only(linked_site):
+    crawler = Crawler(_config(), max_depth=0)
+    crawl = asyncio.create_task(crawler.crawl([linked_site + "/"]))
+    results = await _drain(crawler)
+    stats = await crawl
+    assert stats.fetched == 1
+    assert results[0].page is not None
+    assert len(results[0].page.links) == 2   # links extracted, just not followed
+
+
+async def test_extracted_page_attached_to_results(linked_site):
+    crawler = Crawler(_config(), max_depth=1)
+    crawl = asyncio.create_task(crawler.crawl([linked_site + "/"]))
+    results = await _drain(crawler)
+    await crawl
+    by_path = {r.fetch.url.rsplit("/", 1)[1] or "/": r for r in results}
+    assert "page a" in by_path["a"].page.text
+    assert "root" in by_path["/"].page.text

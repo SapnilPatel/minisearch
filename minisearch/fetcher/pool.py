@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 import aiohttp
 
 from minisearch.config import Config
+from minisearch.extract import Page, extract
 from minisearch.fetcher.single import (
     DisallowedError,
     FetchError,
@@ -45,6 +46,20 @@ _IDLE_NAP_S = 0.01
 
 # Retryable HTTP statuses: server errors and 429 Too Many Requests.
 _RETRYABLE = frozenset({429, 500, 502, 503, 504})
+
+
+@dataclass(frozen=True, slots=True)
+class CrawlResult:
+    """One crawled page: the raw fetch plus, for HTML, the extracted content.
+
+    Extraction happens in the worker (not downstream) because the worker needs
+    the outlinks anyway to feed the frontier — parsing once and shipping the
+    result beats parsing twice. ``page`` is None for non-HTML responses.
+    """
+
+    fetch: FetchResult
+    page: Page | None
+    depth: int
 
 
 @dataclass
@@ -76,12 +91,16 @@ class Crawler:
         config: Config,
         *,
         max_pages: int | None = None,
+        max_depth: int = 0,
         results_maxsize: int | None = None,
     ) -> None:
         self._config = config
         self._max_pages = max_pages
+        # max_depth=0: fetch only the seeds. Depth d pages may enqueue links at
+        # d+1 as long as d+1 <= max_depth — this is what closes the crawl loop.
+        self._max_depth = max_depth
         self.frontier = Frontier(config)
-        self.results: asyncio.Queue[FetchResult | None] = asyncio.Queue(
+        self.results: asyncio.Queue[CrawlResult | None] = asyncio.Queue(
             maxsize=results_maxsize or config.fetcher_workers * 2
         )
         self.stats = CrawlStats()
@@ -135,10 +154,21 @@ class Crawler:
             try:
                 result = await self._fetch_with_retry(item.url, session, robots)
                 if result is not None:
+                    page: Page | None = None
+                    if result.content_type == "text/html":
+                        page = extract(result.url, result.body)
+                        # Feed outlinks back to the frontier (the crawl loop).
+                        # frontier.add dedups via the bloom filter, so a link
+                        # every page carries (nav, footer) costs one entry.
+                        if item.depth < self._max_depth:
+                            for link in page.links:
+                                self.frontier.add(link, depth=item.depth + 1)
                     self.stats.fetched += 1
                     # May block under backpressure — deliberately inside the
                     # host lock, so a slow consumer also slows the crawl.
-                    await self.results.put(result)
+                    await self.results.put(
+                        CrawlResult(fetch=result, page=page, depth=item.depth)
+                    )
             finally:
                 self._in_flight -= 1
                 self.frontier.host_done(item.host, time.monotonic())

@@ -8,7 +8,7 @@ retry with exponential backoff, robots.txt, max page size, and graceful shutdown
 Milestone 1 shipped the single-page fetch; Milestone 3 added the pool.
 """
 
-from minisearch.fetcher.pool import Crawler, CrawlStats
+from minisearch.fetcher.pool import Crawler, CrawlResult, CrawlStats
 from minisearch.fetcher.single import (
     DisallowedError,
     FetchError,
@@ -18,6 +18,7 @@ from minisearch.fetcher.single import (
 
 __all__ = [
     "Crawler",
+    "CrawlResult",
     "CrawlStats",
     "DisallowedError",
     "FetchError",
