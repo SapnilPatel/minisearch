@@ -26,7 +26,8 @@ they must be honest and reproducible.
 | Batch vs row-by-row insert speedup | 6 | — | DB optimization |
 | Query latency p50 / p99 | 7 | — | the SDE headline number |
 | Corpus size vs index size | 6 | — | storage efficiency |
-| Bloom filter FPR: measured vs theoretical | 4 | — | rigor signal |
+| Bloom filter FPR: measured vs theoretical | 4 | **1.020% measured vs 1.004% predicted** at design load (100k items, m=958,512 bits, k=7, 200k distinct probes). Ratio stays 1.00–1.02 from 75% load through 2x overload (5.786% vs 5.788% at 150%; 15.678% vs 15.745% at 200%). Deterministic — no run-to-run variance. `scripts/measure_bloom_fpr.py` | rigor signal: the implementation matches `(1-e^(-kn/m))^k` |
+| Bloom filter memory vs hash set | 4 | **117 KiB vs 11.3 MiB (99x reduction)** at 100k URLs; 9.59 bits/element at 1% target FPR | why the data structure exists |
 | Duplicate pages caught | 4 | — | dedup effectiveness |
 | Speedup from intersecting smallest list first | 7 | — | algorithmic optimization |
 | Peak memory at N pages | 9 | — | resource discipline |

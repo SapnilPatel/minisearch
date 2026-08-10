@@ -52,8 +52,8 @@ Requires Python 3.11+.
 
 ```bash
 # 1. Create and activate a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate
 
 # 2. Install the project with dev tooling
 pip install -e ".[dev]"

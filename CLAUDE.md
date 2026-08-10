@@ -50,8 +50,12 @@ milestone that fills it. See the table in [README.md](README.md).
 ## Commands
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 pip install -e ".[dev]"
 ruff check .
 pytest -q
 ```
+
+Note: the venv is `venv/`, deliberately NOT `.venv/` — macOS keeps re-applying
+the `hidden` file flag to dot-named directories here, and Python 3.13 skips
+hidden `.pth` files, which silently breaks the editable install (see BUGLOG.md).

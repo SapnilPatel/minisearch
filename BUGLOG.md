@@ -41,10 +41,15 @@ lesson.
   Python 3.13's `site.py` deliberately skips *hidden* `.pth` files (a security
   hardening change). So the editable-install hook never ran. pytest had masked
   the problem the whole time by putting the project root on `sys.path` itself.
-- **The fix:** `chflags -R nohidden .venv`.
+- **The fix, round 1:** `chflags -R nohidden .venv` — which macOS quietly
+  **re-applied** within the hour (the flag tracks the dot-named directory;
+  Desktop folders are managed by file-sync daemons that restore it).
+- **The fix, round 2 (durable):** recreate the venv as plain `venv/` — no
+  leading dot, so macOS never flags it. One-line change in docs; problem gone.
 - **Lesson:** "it works under pytest" proves nothing about imports — the test
-  runner rewrites `sys.path`. And when imports behave inconsistently,
-  `python -v` shows what `site` actually did rather than what you assume it did.
+  runner rewrites `sys.path`. When imports behave inconsistently, `python -v`
+  shows what `site` actually did. And if the OS keeps undoing your fix, stop
+  fixing the symptom and remove the trigger.
 
 ## M0 — `@dataclass(slots=True)` default read back a slot descriptor
 

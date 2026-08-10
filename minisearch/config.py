@@ -71,6 +71,12 @@ class Config:
     max_frontier_size: int = 100_000
     per_host_delay_s: float = 1.0
 
+    # --- Dedup (Milestone 4) ------------------------------------------------
+    # Bloom filter sizing: capacity it is tuned for, and the false-positive
+    # rate at that capacity. 1M URLs at 1% costs ~1.2 MB.
+    bloom_expected_urls: int = 1_000_000
+    bloom_target_fpr: float = 0.01
+
     # --- Store / Postgres (Milestone 6) -------------------------------------
     database_url: str = "postgresql://localhost:5432/minisearch"
 
@@ -107,6 +113,8 @@ class Config:
         _set("retry_base_delay_s", _env_float("RETRY_BASE_DELAY_S"))
         _set("max_frontier_size", _env_int("MAX_FRONTIER_SIZE"))
         _set("per_host_delay_s", _env_float("PER_HOST_DELAY_S"))
+        _set("bloom_expected_urls", _env_int("BLOOM_EXPECTED_URLS"))
+        _set("bloom_target_fpr", _env_float("BLOOM_TARGET_FPR"))
         _set("database_url", _env_str("DATABASE_URL"))
         _set("api_host", _env_str("API_HOST"))
         _set("api_port", _env_int("API_PORT"))

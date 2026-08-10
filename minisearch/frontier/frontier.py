@@ -40,6 +40,7 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 from minisearch.config import Config
+from minisearch.dedup import BloomFilter
 from minisearch.urls import canonicalize
 
 
@@ -80,9 +81,15 @@ class Frontier:
         # Hosts with a fetch currently in flight (popped, not yet host_done).
         self._busy: set[str] = set()
 
-        # Dedup of every URL ever enqueued. NOTE: this grows unbounded — exactly
-        # the memory problem the Milestone 4 bloom filter replaces it with.
-        self._seen: set[str] = set()
+        # Dedup of every URL ever enqueued. A bloom filter, not a set: constant
+        # ~1.2 bytes/URL instead of storing every URL string forever. The cost
+        # is a tunable false-positive rate — rarely, a never-seen URL is
+        # skipped — which is acceptable for a crawler; the impossible direction
+        # (re-enqueueing a seen URL, i.e. a false negative) is what matters.
+        self._seen = BloomFilter(
+            expected_items=config.bloom_expected_urls,
+            target_fpr=config.bloom_target_fpr,
+        )
 
         self._seq = 0
         self._size = 0        # total URLs held (front + back)
