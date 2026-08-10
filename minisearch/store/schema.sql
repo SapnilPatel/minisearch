@@ -6,11 +6,13 @@
 --
 -- Apply with:  psql minisearch -f minisearch/store/schema.sql
 
--- One row per crawled document.
+-- One row per crawled document. Extracted text is stored (not just indexed)
+-- because snippet generation at query time needs the original words.
 CREATE TABLE IF NOT EXISTS documents (
     id           BIGSERIAL PRIMARY KEY,
     url          TEXT        NOT NULL UNIQUE,   -- canonical (normalized) URL
     title        TEXT,
+    text         TEXT        NOT NULL,          -- extracted body text (for snippets)
     content_hash BYTEA       NOT NULL,          -- hash of extracted text, for dedup
     length       INTEGER     NOT NULL,          -- token count; BM25 needs per-doc length
     fetched_at   TIMESTAMPTZ NOT NULL DEFAULT now()

@@ -11,6 +11,21 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      # Real PostgreSQL for the store integration tests — mocking the database
+      # would test the mock. Tests skip gracefully if it is unreachable.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: minisearch
+          POSTGRES_PASSWORD: minisearch
+          POSTGRES_DB: minisearch
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U minisearch"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://minisearch:minisearch@localhost:5432/minisearch
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +41,11 @@ jobs:
 
       - name: Lint (ruff)
         run: ruff check .
+
+      - name: Apply database schema
+        run: |
+          sudo apt-get install -y -q postgresql-client >/dev/null
+          psql "$DATABASE_URL" -f minisearch/store/schema.sql
 
       - name: Test (pytest)
         run: pytest -q

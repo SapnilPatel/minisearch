@@ -23,7 +23,7 @@ they must be honest and reproducible.
 |---|---|---|---|
 | Pages crawled/sec | 3 | **~7,400 pages/sec** (7375 / 7408 / 7419 over 3 runs; 1,000 pages, 8 workers, ~1 KB pages, localhost, politeness delay 0) | headline throughput. Localhost = upper bound on pool overhead; real crawls are network/politeness-bound. Peak RSS 40.4 MB. `scripts/bench_crawl.py` |
 | Documents indexed/sec | 6 | — | ingest performance |
-| Batch vs row-by-row insert speedup | 6 | — | DB optimization |
+| Batch vs row-by-row insert speedup | 6 | **36x** executemany-in-one-tx (387,603 vs 10,766 rows/sec), **56x** COPY (602,488 rows/sec). 5,000 posting rows, median of 3 runs, spreads tight (row-by-row 0.449–0.477s). Row-by-row pays a round-trip + WAL fsync per row; a batch pays one each per transaction. `scripts/bench_inserts.py` | DB optimization |
 | Query latency p50 / p99 | 7 | — | the SDE headline number |
 | Corpus size vs index size | 6 | — | storage efficiency |
 | Bloom filter FPR: measured vs theoretical | 4 | **1.020% measured vs 1.004% predicted** at design load (100k items, m=958,512 bits, k=7, 200k distinct probes). Ratio stays 1.00–1.02 from 75% load through 2x overload (5.786% vs 5.788% at 150%; 15.678% vs 15.745% at 200%). Deterministic — no run-to-run variance. `scripts/measure_bloom_fpr.py` | rigor signal: the implementation matches `(1-e^(-kn/m))^k` |

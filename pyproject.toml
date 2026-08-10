@@ -16,6 +16,7 @@ keywords = ["search-engine", "web-crawler", "bm25", "inverted-index", "informati
 dependencies = [
     "aiohttp>=3.9",       # async HTTP client for the fetcher pool (Milestone 3)
     "python-dotenv>=1.0", # load local .env into the environment (config)
+    "asyncpg>=0.29",      # PostgreSQL driver for the store (Milestone 6)
 ]
 
 [project.optional-dependencies]
