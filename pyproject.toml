@@ -26,6 +26,9 @@ dev = [
     "ruff>=0.6",
 ]
 
+[project.scripts]
+minisearch = "minisearch.api.server:main"
+
 [project.urls]
 Repository = "https://github.com/SapnilPatel/minisearch"
 
