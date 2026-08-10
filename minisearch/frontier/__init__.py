@@ -1,6 +1,12 @@
-"""The URL frontier — a priority queue with politeness (Milestone 2).
+"""The URL frontier — Mercator-style two-level queue (Milestone 2).
 
-A min-heap keyed by score (shallower depth = higher priority) plus a per-host map
-of nextAllowedTime. Pop the best URL whose host is currently allowed; defer the
-rest. Not a plain FIFO: it must crawl important pages first AND never hammer one
-host."""
+Front queues implement priority (shallower depth = higher priority); per-host
+back queues plus a min-heap of next-allowed-times implement politeness. The
+split is what lets the frontier crawl important pages first AND never hammer
+one host AND resist starvation by a flooding host. See frontier.py for the
+full design discussion.
+"""
+
+from minisearch.frontier.frontier import Frontier, FrontierItem
+
+__all__ = ["Frontier", "FrontierItem"]
