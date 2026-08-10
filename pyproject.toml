@@ -1,0 +1,51 @@
+[project]
+name = "minisearch"
+version = "0.1.0"
+description = "A concurrent web crawler and search engine: crawl pages, build an inverted index, rank with BM25, serve queries over a REST API."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Sapnil Patel" }]
+keywords = ["search-engine", "web-crawler", "bm25", "inverted-index", "information-retrieval"]
+
+# Runtime dependencies are kept intentionally minimal. The core data structures
+# and algorithms this project exists to demonstrate — bloom filter, priority
+# frontier, inverted index, BM25, Porter stemmer — are all hand-rolled, not
+# pulled from a library. Third-party packages are only used for the plumbing
+# (async HTTP, config, the DB driver) that is not the point of the exercise.
+dependencies = [
+    "aiohttp>=3.9",       # async HTTP client for the fetcher pool (Milestone 3)
+    "python-dotenv>=1.0", # load local .env into the environment (config)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.6",
+]
+
+[project.urls]
+Repository = "https://github.com/SapnilPatel/minisearch"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["minisearch*"]
+
+[tool.pytest.ini_options]
+# asyncio_mode = "auto" lets us write `async def test_...` without decorating
+# every coroutine test — pytest-asyncio picks them up automatically.
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# E/F: pycodestyle + pyflakes (the essentials).
+# I:   import sorting.  UP: pyupgrade (modern syntax).  B: bugbear (footguns).
+select = ["E", "F", "I", "UP", "B"]
